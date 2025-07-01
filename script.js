@@ -2,51 +2,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const cryptoListContainer = document.getElementById('cryptoList');
     const searchInput = document.getElementById('searchInput');
 
-    // --- Placeholder data to simulate an API response ---
-    const placeholderData = [
-        {
-            name: 'Bitcoin',
-            symbol: 'btc',
-            current_price: 65000.50,
-            price_change_percentage_24h: 2.5,
-            image: 'https://assets.coingecko.com/coins/images/1/large/bitcoin.png?1547033479'
-        },
-        {
-            name: 'Ethereum',
-            symbol: 'eth',
-            current_price: 3500.25,
-            price_change_percentage_24h: -1.2,
-            image: 'https://assets.coingecko.com/coins/images/279/large/ethereum.png?1595348880'
-        },
-        {
-            name: 'Solana',
-            symbol: 'sol',
-            current_price: 150.70,
-            price_change_percentage_24h: 5.1,
-            image: 'https://assets.coingecko.com/coins/images/4128/large/solana.png?1640133422'
-        },
-        {
-            name: 'Ripple',
-            symbol: 'xrp',
-            current_price: 0.52,
-            price_change_percentage_24h: -0.8,
-            image: 'https://assets.coingecko.com/coins/images/447/large/xrp-symbol-white-128.png?1605779032'
-        },
-        {
-            name: 'Cardano',
-            symbol: 'ada',
-            current_price: 0.45,
-            price_change_percentage_24h: 3.2,
-            image: 'https://assets.coingecko.com/coins/images/975/large/cardano.png?1547034860'
-        },
-        {
-            name: 'Dogecoin',
-            symbol: 'doge',
-            current_price: 0.18,
-            price_change_percentage_24h: 1.5,
-            image: 'https://assets.coingecko.com/coins/images/5/large/dogecoin.png?1547034079'
-        },
-    ];
+    // ** New: API endpoint URL **
+    const API_URL = 'https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=100&page=1&sparkline=false';
 
     /**
      * Renders the list of cryptocurrency cards on the page.
@@ -60,8 +17,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         data.forEach(coin => {
-            const priceChangeClass = coin.price_change_percentage_24h >= 0 ? 'positive' : 'negative';
-            const priceChangeArrow = coin.price_change_percentage_24h >= 0 ? '▲' : '▼';
+            const priceChangeClass = coin.price_change_percentage_24h_in_currency >= 0 ? 'positive' : 'negative';
+            const priceChangeArrow = coin.price_change_percentage_24h_in_currency >= 0 ? '▲' : '▼';
 
             const cardHTML = `
                 <div class="crypto-card">
@@ -74,7 +31,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     </div>
                     <div class="crypto-price">$${coin.current_price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                     <div class="price-change ${priceChangeClass}">
-                        ${priceChangeArrow} ${Math.abs(coin.price_change_percentage_24h).toFixed(2)}% (24h)
+                        ${priceChangeArrow} ${Math.abs(coin.price_change_percentage_24h_in_currency).toFixed(2)}% (24h)
                     </div>
                 </div>
             `;
@@ -82,17 +39,49 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Initial render with placeholder data
-    renderCryptoCards(placeholderData);
+    /**
+     * Fetches cryptocurrency data from the CoinGecko API.
+     */
+    async function fetchCryptoData() {
+        cryptoListContainer.innerHTML = '<div class="loading">Loading cryptocurrency data...</div>'; // Show loading state
 
-    // --- Add search functionality ---
+        try {
+            const response = await fetch(API_URL);
+
+            // Check if the response is successful (status code 200)
+            if (!response.ok) {
+                // Throw an error if the response is not OK (e.g., 404, 500)
+                throw new Error(`API request failed with status: ${response.status}`);
+            }
+
+            const data = await response.json();
+            
+            // Store the fetched data for filtering (we need to make this global or accessible)
+            window.allCryptoData = data; 
+            
+            renderCryptoCards(data); // Render all fetched data initially
+            
+        } catch (error) {
+            console.error('Error fetching data:', error);
+            cryptoListContainer.innerHTML = `<div class="loading error">Failed to load data. Please try again later. <br/> Error: ${error.message}</div>`;
+        }
+    }
+
+    // --- Search functionality is now updated to filter live data ---
     searchInput.addEventListener('input', (e) => {
         const searchTerm = e.target.value.toLowerCase();
-        const filteredData = placeholderData.filter(coin =>
+        
+        // Filter the globally stored data
+        const filteredData = window.allCryptoData.filter(coin =>
             coin.name.toLowerCase().includes(searchTerm) || coin.symbol.toLowerCase().includes(searchTerm)
         );
+        
         renderCryptoCards(filteredData);
     });
+    
+    // Fetch data when the page loads
+    fetchCryptoData();
 
-    // You can add more functionality here, like a detail view on click.
+    // ** Optional: Refresh data every 60 seconds to show live updates **
+    setInterval(fetchCryptoData, 60000); // 60000 milliseconds = 1 minute
 });
